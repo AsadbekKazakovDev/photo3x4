@@ -252,7 +252,6 @@
     </div>
 
     <script>
-        // Python backend manzilingiz
         const BACKEND_URL = "https://photo3x4.onrender.com/api/remove-bg";
 
         let activeFrame = 1;
@@ -300,7 +299,7 @@
             }
         }
 
-        // Yuklash tugmasini bog'lash
+        // Yuklah tugmasini bog'lash
         function triggerUpload() { 
             document.getElementById('fileInput').click(); 
         }
@@ -312,43 +311,48 @@
             }
         }
 
-        // Python Backend orqali rasmni mutlaqo bepul tozalash
+        // Python Backend orqali tozalash (Mutlaqo moslangan JSON format)
         async function processImage(file) {
             const frameElement = document.getElementById(`f${activeFrame}`);
             
-            // Loader qo'shish
+            // Loader yaratish
             const loader = document.createElement('div');
             loader.className = 'loading-overlay';
             loader.innerHTML = '<div class="spinner"></div><div>Fon oqartirilmoqda...</div>';
             frameElement.appendChild(loader);
 
-            // Python backend kutganidek ma'lumotni FormData ko'rinishida tayyorlash
-            const formData = new FormData();
-            formData.append('image', file);
+            // Rasmni o'qib, srazu to'g'ri JSON ko'rinishida yuborish
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = async () => {
+                const base64Data = reader.result.split(',')[1];
 
-            try {
-                const response = await fetch(BACKEND_URL, {
-                    method: 'POST',
-                    body: formData
-                });
+                try {
+                    const response = await fetch(BACKEND_URL, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ image_base64: base64Data })
+                    });
 
-                const data = await response.json();
+                    const data = await response.json();
 
-                if (response.ok && data.success) {
-                    // Kelgan base64 tasvirini slotlarga chizish uchun uzatamiz
-                    drawImage(data.image);
-                } else {
-                    alert("Xatolik: " + (data.error || "Backend rasmni qayta ishlay olmadi."));
+                    if (response.ok && data.success) {
+                        drawImage(data.image);
+                    } else {
+                        alert("Xatolik: " + (data.error || "Server rasmni qayta ishlay olmadi."));
+                    }
+                } catch (error) {
+                    alert("Backend serveringiz bilan bog'lanishda xato! Render paneli 'Live' holatiga kelganini tekshiring.");
+                    console.error(error);
+                } finally {
+                    loader.remove(); // Loaderni tozalash
                 }
-            } catch (error) {
-                alert("Python backend serveringiz o'chirilgan, uxlab qolgan yoki ulanib bo'lmadi! (Render panelida Live bo'lishini kuting)");
-                console.error(error);
-            } finally {
-                loader.remove(); // Loader oynasini olib tashlash
-            }
+            };
         }
 
-        // Tozalangan rasmni barrasiga joylash
+        // Tozalangan rasmni slotlarga chizish
         function drawImage(imageUrl) {
             document.querySelectorAll(`#f${activeFrame} .slot`).forEach(slot => {
                 let img = slot.querySelector('img');

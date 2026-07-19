@@ -6,7 +6,7 @@ from PIL import Image
 from rembg import remove, new_session
 
 app = Flask(__name__)
-# Vercel-dan so'rovlar muammosiz kelishi uchun CORS to'liq yoqildi
+# Vercel-dan keladigan so'rovlarni bloklamasligi uchun CORS-ni to'liq ochamiz
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # RAMni tejash uchun eng yengil AI model sessiyasini global e'lon qilamiz (~4 MB)
@@ -15,14 +15,16 @@ session = new_session("u2netp")
 @app.route('/api/remove-bg', methods=['POST'])
 def remove_bg():
     try:
-        if 'image' not in request.files:
-            return jsonify({'success': False, 'error': 'Rasm yuklanmadi!'}), 400
+        # Frontend-dan kelgan JSON ma'lumotni qabul qilish
+        data = request.get_json()
+        if not data or 'image_base64' not in data:
+            return jsonify({'success': False, 'error': 'JSON so\'rovda image_base64 topilmadi!'}), 400
         
-        file = request.files['image']
-        image_bytes = file.read()
-        
-        # Rasmni o'qish va fonini o'chirish
+        # Base64 satrni rasm baytlariga o'tkazish
+        image_bytes = base64.b64decode(data['image_base64'])
         input_image = Image.open(io.BytesIO(image_bytes))
+        
+        # Fonni o'chirish
         output_image = remove(input_image, session=session)
         
         # Agar rasm shaffof (RGBA) bo'lsa, uni oq fonga silliq birlashtiramiz
@@ -38,12 +40,12 @@ def remove_bg():
         final_image.save(img_io, 'JPEG', quality=95)
         img_io.seek(0)
         
-        # Frontend o'qiy olishi uchun base64 formatiga o'tkazish
-        base64_image = base64.b64encode(img_io.getvalue()).decode('utf-8')
+        # Qayta base64 formatiga o'tkazish
+        base64_result = base64.b64encode(img_io.getvalue()).decode('utf-8')
         
         return jsonify({
             'success': True,
-            'image': f"data:image/jpeg;base64,{base64_image}"
+            'image': f"data:image/jpeg;base64,{base64_result}"
         })
 
     except Exception as e:
