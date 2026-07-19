@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional 3x4 Rasm Generator (Auto Background Remover)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f1f5f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Boshqaruv paneli */
+        .controls {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+            width: 297mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .panel-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .panel-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .panel-subtitle {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        /* Mijozlar sonini tanlash tugmalari */
+        .modes {
+            display: flex;
+            align-items: center;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .mode-btn {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .mode-btn.active {
+            background: white;
+            color: #3b82f6;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Amallar tugmalari */
+        .actions-group {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            color: white;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+        .btn-upload { background-color: #3b82f6; }
+        .btn-upload:hover { background-color: #2563eb; }
+        .btn-print { background-color: #10b981; }
+        .btn-print:hover { background-color: #059669; }
+
+        /* A4 Albom Varaq Maketi (297mm x 210mm) */
+        .a4-page {
+            width: 297mm;
+            height: 210mm;
+            background: white;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            padding: 10mm 15mm;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 8mm;
+            justify-content: center;
+            align-content: center;
+            position: relative;
+        }
+
+        /* 6 talik ramka bloki */
+        .frame {
+            border: 1.5px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 4mm;
+            background: #fafafa;
+            display: grid;
+            grid-template-columns: repeat(3, 30mm);
+            grid-template-rows: repeat(2, 40mm);
+            gap: 3mm;
+            justify-content: center;
+            align-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .frame:hover {
+            border-color: #94a3b8;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.02);
+        }
+        .frame.active {
+            border: 2px solid #3b82f6;
+            background-color: #f0f9ff;
+        }
+
+        /* Yuklanmoqda (Loader) sirti */
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: #3b82f6;
+            z-index: 10;
+            border-radius: 6px;
+        }
+        .spinner {
+            width: 30px; height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 3x4 Slot o'lchami */
+        .slot {
+            width: 30mm;
+            height: 40mm;
+            background-color: #e2e8f0;
+            border: 0.5px solid #94a3b8;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .slot::before {
+            content: "3x4";
+            color: #94a3b8;
+            font-size: 11px;
+            position: absolute;
+            z-index: 1;
+        }
+        .slot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Yashirilgan holati */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Chop etish (Print) sozlamalari */
+        @media print {
+            body { background: none; padding: 0; margin: 0; }
+            .controls { display: none !important; }
+            .a4-page {
+                box-shadow: none;
+                margin: 0;
+                width: 297mm;
+                height: 210mm;
+                page-break-inside: avoid;
+            }
+            .frame {
+                border: 1px dashed #cbd5e1 !important;
+                background: none !important;
+            }
+            .frame.active {
+                border: 1px dashed #cbd5e1 !important;
+            }
+            .hidden {
+                visibility: hidden;
+                display: none !important;
+            }
+            @page {
+                size: A4 landscape;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="panel-info">
+            <h1 class="panel-title">3x4 Rasm Generator (Auto BG White)</h1>
+            <p class="panel-subtitle">Ramkani tanlang va rasmni yuklang yoki Ctrl + V ni bosing.</p>
+        </div>
+
+        <div class="modes">
+            <button class="mode-btn" onclick="setMode(1)">1 Mijoz</button>
+            <button class="mode-btn" onclick="setMode(2)">2 Mijoz</button>
+            <button class="mode-btn" onclick="setMode(3)">3 Mijoz</button>
+            <button class="mode-btn active" onclick="setMode(4)">4 Mijoz</button>
+        </div>
+
+        <div class="actions-group">
+            <button class="btn btn-upload" onclick="triggerUpload()">Rasm yuklash</button>
+            <button class="btn btn-print" onclick="window.print()">Chop etish (PDF)</button>
+        </div>
+        
+        <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="fileLoaded(this)">
+    </div>
+
+    <div class="a4-page">
+        <div class="frame active" id="f1" onclick="selectFrame(1)"></div>
+        <div class="frame" id="f2" onclick="selectFrame(2)"></div>
+        <div class="frame" id="f3" onclick="selectFrame(3)"></div>
+        <div class="frame" id="f4" onclick="selectFrame(4)"></div>
+    </div>
+
+    <script>
+        // Tashqi API o'rniga o'zingizning Python backend manzilingiz:
+        const BACKEND_URL = "http://localhost:5000/api/remove-bg";
+
+        let activeFrame = 1;
+        let totalFrames = 4;
+
+        // Har bir ramka ichiga qat'iy 6 tadan slot yaratish
+        for (let f = 1; f <= 4; f++) {
+            const frame = document.getElementById(`f${f}`);
+            for (let i = 0; i < 6; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                frame.appendChild(slot);
+            }
+        }
+
+        // Mijozlar soniga mos ravishda ramkalarni ko'rsatish/yashirish
+        function setMode(num) {
+            totalFrames = num;
+            
+            const buttons = document.querySelectorAll('.mode-btn');
+            buttons.forEach((btn, idx) => {
+                btn.classList.toggle('active', idx + 1 === num);
+            });
+
+            for (let i = 1; i <= 4; i++) {
+                const frame = document.getElementById(`f${i}`);
+                if (i <= num) {
+                    frame.classList.remove('hidden');
+                } else {
+                    frame.classList.add('hidden');
+                }
+            }
+
+            if (activeFrame > num) {
+                selectFrame(1);
+            }
+        }
+
+        // Bosilgan ramkani faollashtirish
+        function selectFrame(num) {
+            if (num > totalFrames) return;
+            activeFrame = num;
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`f${i}`).classList.toggle('active', i === num);
+            }
+        }
+
+        // Yuklah tugmasini bog'lash
+        function triggerUpload() { 
+            document.getElementById('fileInput').click(); 
+        }
+
+        // Fayl tanlanganidagi hodisa
+        function fileLoaded(input) {
+            if (input.files && input.files[0]) {
+                processImage(input.files[0]);
+            }
+        }
+
+        // Python Backend orqali rasmni mutlaqo bepul tozalash
+        async function processImage(file) {
+            const frameElement = document.getElementById(`f${activeFrame}`);
+            
+            // Loader qo'shish
+            const loader = document.createElement('div');
+            loader.className = 'loading-overlay';
+            loader.innerHTML = '<div class="spinner"></div><div>Fon oqartirilmoqda...</div>';
+            frameElement.appendChild(loader);
+
+            // Rasmni Base64 formatiga o'tkazish
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = async () => {
+                const base64Data = reader.result.split(',')[1];
+
+                try {
+                    const response = await fetch(BACKEND_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image_base64: base64Data })
+                    });
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const imageUrl = URL.createObjectURL(blob);
+                        drawImage(imageUrl);
+                    } else {
+                        const err = await response.json();
+                        alert("Xatolik: " + (err.error || "Backend rasmni qayta ishlay olmadi."));
+                    }
+                } catch (error) {
+                    alert("Python backend serveringiz o'chirilgan yoki ulanib bo'lmadi! (app.py ishga tushganini tekshiring)");
+                    console.error(error);
+                } finally {
+                    loader.remove(); // Loader oynasini olib tashlash
+                }
+            };
+        }
+
+        // Tozalangan rasmni barrasiga joylash
+        function drawImage(imageUrl) {
+            document.querySelectorAll(`#f${activeFrame} .slot`).forEach(slot => {
+                let img = slot.querySelector('img');
+                if (!img) {
+                    img = document.createElement('img');
+                    slot.appendChild(img);
+                }
+                img.src = imageUrl;
+            });
+        }
+
+        // Clipboard-dan Ctrl + V (Paste) hodisasi
+        window.addEventListener('paste', e => {
+            const item = Array.from(e.clipboardData.items).find(x => x.type.indexOf('image/') !== -1);
+            if (item) {
+                processImage(item.getAsFile());
+            }
+        });
+    </script>
+</body>
+</html>
