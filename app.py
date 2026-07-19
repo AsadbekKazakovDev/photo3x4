@@ -1,45 +1,53 @@
 import io
 import base64
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-from rembg import remove
-from PIL import Image, ImageOps
+from PIL import Image
+from rembg import remove, new_session
 
 app = Flask(__name__)
-# Frontend boshqa port yoki serverda tursa muammo bo'lmasligi uchun CORS yoqamiz
-CORS(app)
+# Vercel-dan so'rovlar muammosiz kelishi uchun CORS to'liq yoqildi
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# RAMni tejash uchun eng yengil AI model sessiyasini global e'lon qilamiz (~4 MB)
+session = new_session("u2netp")
 
 @app.route('/api/remove-bg', methods=['POST'])
-def remove_background():
+def remove_bg():
     try:
-        data = request.json
-        if not data or 'image_base64' not in data:
-            return jsonify({'error': 'Rasm maʼlumotlari yuborilmadi!'}), 400
-
-        # Front-enddan kelgan Base64 matnni rasmga aylantirish
-        image_bytes = base64.b64decode(data['image_base64'])
-        input_image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-
-        # 1. AI Model orqali fonni shaffof (transparent) qilish
-        output_image = remove(input_image)
-
-        # 2. Shaffof rasmni toza oq fonga joylashtirish (3x4 uchun oq fon shart)
-        white_background = Image.new("RGBA", output_image.size, "WHITE")
-        final_image = Image.alpha_composite(white_background, output_image).convert("RGB")
-
-        # Natijani xotirada (Buffer) saqlash
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': 'Rasm yuklanmadi!'}), 400
+        
+        file = request.files['image']
+        image_bytes = file.read()
+        
+        # Rasmni o'qish va fonini o'chirish
+        input_image = Image.open(io.BytesIO(image_bytes))
+        output_image = remove(input_image, session=session)
+        
+        # Agar rasm shaffof (RGBA) bo'lsa, uni oq fonga silliq birlashtiramiz
+        if output_image.mode in ('RGBA', 'LA'):
+            white_bg = Image.new("RGBA", output_image.size, "WHITE")
+            white_bg.paste(output_image, (0, 0), output_image)
+            final_image = white_bg.convert("RGB")
+        else:
+            final_image = output_image.convert("RGB")
+            
+        # Rasmni JPEG formatida xotiraga saqlash
         img_io = io.BytesIO()
         final_image.save(img_io, 'JPEG', quality=95)
         img_io.seek(0)
-
-        return send_file(img_io, mimetype='image/jpeg')
+        
+        # Frontend o'qiy olishi uchun base64 formatiga o'tkazish
+        base64_image = base64.b64encode(img_io.getvalue()).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'image': f"data:image/jpeg;base64,{base64_image}"
+        })
 
     except Exception as e:
-        print(f"Xatolik: {str(e)}")
-        return jsonify({'error': f'Server xatoligi: {str(e)}'}), 500
-@app.route('/')
-def ping():
-    return "Server is live and kicking!", 200
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
-    # Mahalliy tarmoqda ham ishlatish uchun 0.0.0.0 va 5000-portda ishga tushiramiz
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=7860)

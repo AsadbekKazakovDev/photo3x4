@@ -252,7 +252,7 @@
     </div>
 
     <script>
-        // Tashqi API o'rniga o'zingizning Python backend manzilingiz:
+        // Python backend manzilingiz
         const BACKEND_URL = "https://photo3x4.onrender.com/api/remove-bg";
 
         let activeFrame = 1;
@@ -300,7 +300,7 @@
             }
         }
 
-        // Yuklah tugmasini bog'lash
+        // Yuklash tugmasini bog'lash
         function triggerUpload() { 
             document.getElementById('fileInput').click(); 
         }
@@ -322,34 +322,30 @@
             loader.innerHTML = '<div class="spinner"></div><div>Fon oqartirilmoqda...</div>';
             frameElement.appendChild(loader);
 
-            // Rasmni Base64 formatiga o'tkazish
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onloadend = async () => {
-                const base64Data = reader.result.split(',')[1];
+            // Python backend kutganidek ma'lumotni FormData ko'rinishida tayyorlash
+            const formData = new FormData();
+            formData.append('image', file);
 
-                try {
-                    const response = await fetch(BACKEND_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image_base64: base64Data })
-                    });
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    body: formData
+                });
 
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        const imageUrl = URL.createObjectURL(blob);
-                        drawImage(imageUrl);
-                    } else {
-                        const err = await response.json();
-                        alert("Xatolik: " + (err.error || "Backend rasmni qayta ishlay olmadi."));
-                    }
-                } catch (error) {
-                    alert("Python backend serveringiz o'chirilgan yoki ulanib bo'lmadi! (app.py ishga tushganini tekshiring)");
-                    console.error(error);
-                } finally {
-                    loader.remove(); // Loader oynasini olib tashlash
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Kelgan base64 tasvirini slotlarga chizish uchun uzatamiz
+                    drawImage(data.image);
+                } else {
+                    alert("Xatolik: " + (data.error || "Backend rasmni qayta ishlay olmadi."));
                 }
-            };
+            } catch (error) {
+                alert("Python backend serveringiz o'chirilgan, uxlab qolgan yoki ulanib bo'lmadi! (Render panelida Live bo'lishini kuting)");
+                console.error(error);
+            } finally {
+                loader.remove(); // Loader oynasini olib tashlash
+            }
         }
 
         // Tozalangan rasmni barrasiga joylash
