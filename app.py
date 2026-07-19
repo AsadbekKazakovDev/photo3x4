@@ -37,7 +37,9 @@ def remove_background():
     except Exception as e:
         print(f"Xatolik: {str(e)}")
         return jsonify({'error': f'Server xatoligi: {str(e)}'}), 500
-
+@app.route('/')
+def ping():
+    return "Server is live and kicking!", 200
 if __name__ == '__main__':
     # Mahalliy tarmoqda ham ishlatish uchun 0.0.0.0 va 5000-portda ishga tushiramiz
     app.run(host='0.0.0.0', port=5000, debug=True)
