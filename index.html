@@ -252,7 +252,8 @@
     </div>
 
     <script>
-        const BACKEND_URL = "https://photo3x4.onrender.com/api/remove-bg";
+        // Tashqi API o'rniga o'zingizning Python backend manzilingiz:
+        const BACKEND_URL = "http://localhost:5000/api/remove-bg";
 
         let activeFrame = 1;
         let totalFrames = 4;
@@ -311,17 +312,17 @@
             }
         }
 
-        // Python Backend orqali tozalash (Mutlaqo moslangan JSON format)
+        // Python Backend orqali rasmni mutlaqo bepul tozalash
         async function processImage(file) {
             const frameElement = document.getElementById(`f${activeFrame}`);
             
-            // Loader yaratish
+            // Loader qo'shish
             const loader = document.createElement('div');
             loader.className = 'loading-overlay';
             loader.innerHTML = '<div class="spinner"></div><div>Fon oqartirilmoqda...</div>';
             frameElement.appendChild(loader);
 
-            // Rasmni o'qib, srazu to'g'ri JSON ko'rinishida yuborish
+            // Rasmni Base64 formatiga o'tkazish
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onloadend = async () => {
@@ -330,29 +331,28 @@
                 try {
                     const response = await fetch(BACKEND_URL, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ image_base64: base64Data })
                     });
 
-                    const data = await response.json();
-
-                    if (response.ok && data.success) {
-                        drawImage(data.image);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const imageUrl = URL.createObjectURL(blob);
+                        drawImage(imageUrl);
                     } else {
-                        alert("Xatolik: " + (data.error || "Server rasmni qayta ishlay olmadi."));
+                        const err = await response.json();
+                        alert("Xatolik: " + (err.error || "Backend rasmni qayta ishlay olmadi."));
                     }
                 } catch (error) {
-                    alert("Backend serveringiz bilan bog'lanishda xato! Render paneli 'Live' holatiga kelganini tekshiring.");
+                    alert("Python backend serveringiz o'chirilgan yoki ulanib bo'lmadi! (app.py ishga tushganini tekshiring)");
                     console.error(error);
                 } finally {
-                    loader.remove(); // Loaderni tozalash
+                    loader.remove(); // Loader oynasini olib tashlash
                 }
             };
         }
 
-        // Tozalangan rasmni slotlarga chizish
+        // Tozalangan rasmni barrasiga joylash
         function drawImage(imageUrl) {
             document.querySelectorAll(`#f${activeFrame} .slot`).forEach(slot => {
                 let img = slot.querySelector('img');
